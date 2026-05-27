@@ -1,36 +1,36 @@
 # Invoice Automation
 
-Otomatisasi end-to-end: dari email Gmail → klasifikasi → render PDF/image → vision OCR (LightOn OCR atau GPT-4o) → validasi → CSV.
+End-to-end automation: Gmail email → classification → PDF/image render → vision OCR (LightOn OCR or GPT-4o) → validation → CSV.
 
-## Tampilan UI
+## UI Preview
 
-Streamlit UI di `http://localhost:8502` (jalankan via `python start.py`).
+Streamlit UI at `http://localhost:8502` (launch with `python start.py`).
 
-**All Invoices — tabel hasil ekstraksi + validation flag:**
+**All Invoices — extraction results table + validation flags:**
 
 ![All Invoices view](docs/ui-with-data.png)
 
-**Empty state — sidebar Run Settings (Source / Engine / Outputs):**
+**Empty state — Run Settings sidebar (Source / Engine / Outputs):**
 
 ![Run Settings sidebar](docs/ui-main.png)
 
-Sesuai flowchart:
+Per the flowchart:
 
 ```
 Gmail (time_init, time_final)
         ↓
-Klasifikasi + Mark as read
+Classify + Mark as read
         ↓
 Render PDF/image → PNG (PyMuPDF)
         ↓
-Pilih engine: LightOn OCR  ATAU  GPT-4o (vision)
+Pick engine: LightOn OCR  OR  GPT-4o (vision)
         ↓
-Validasi → CSV (default)  [Excel + Google Sheet opsional]
+Validate → CSV (default)  [Excel + Google Sheet optional]
 ```
 
-> **Catatan**: Pipeline ini **image-first**. PDF native pun di-render ke PNG dulu, bukan ekstrak teks layer-nya. Ini supaya engine pilihan (LightOn OCR / GPT-4o) selalu lihat dokumen yang sama dengan mata-nya sendiri.
+> **Note**: This pipeline is **image-first**. Native PDFs are rendered to PNG first rather than extracting the text layer. This ensures the chosen engine (LightOn OCR / GPT-4o) always sees the document with its own eyes.
 
-## Struktur
+## Structure
 
 ```
 invoice_automation/
@@ -39,16 +39,16 @@ invoice_automation/
 ├── pdf_to_images.py     # PDF/image → list of PNG (PyMuPDF + Pillow)
 ├── ai_extractor.py      # engine switch: lighton | gpt-4o  (schema = source of truth)
 ├── validator.py         # cross-check line items
-├── csv_exporter.py      # CSV (default) — kolom otomatis ikut EXTRACTION_SCHEMA
-├── excel_exporter.py    # openpyxl, opsional (--excel)
-├── sheets_exporter.py   # gspread, opsional (--sheets)
+├── csv_exporter.py      # CSV (default) — columns auto-derived from EXTRACTION_SCHEMA
+├── excel_exporter.py    # openpyxl, optional (--excel)
+├── sheets_exporter.py   # gspread, optional (--sheets)
 ├── config.py            # env loader
 ├── requirements.txt
 ├── install.sh
 ├── .env.example
 ├── credentials/         # OAuth + service-account JSON (gitignored)
-├── downloads/           # attachment + rendered pages
-└── output/              # CSV + JSON dump + (opsional) xlsx
+├── downloads/           # attachments + rendered pages
+└── output/              # CSV + JSON dump + (optional) xlsx
 ```
 
 ## Setup
@@ -60,102 +60,102 @@ cd /home/rnd/Documents/Belajar/Portofolio_tambbahan/invoice_automation
 ./install.sh
 ```
 
-Atau manual:
+Or manually:
 
 ```bash
 /home/rnd/Documents/Belajar/Portofolio_tambbahan/venv/bin/pip install -r requirements.txt
 ```
 
-> Tidak butuh Tesseract lagi — OCR dilakukan oleh LightOn / GPT-4o.
+> Tesseract is no longer required — OCR is handled by LightOn / GPT-4o.
 
-### 2. Isi `.env`
+### 2. Fill in `.env`
 
 ```bash
 cp .env.example .env && nano .env
 ```
 
-Minimal yang harus diisi:
+Minimum required:
 
 ```env
-DEFAULT_AI_ENGINE=lighton          # atau gpt-4o
+DEFAULT_AI_ENGINE=lighton          # or gpt-4o
 
-# kalau pakai LightOn:
+# if using LightOn:
 LIGHTON_API_KEY=<your key>
-LIGHTON_BASE_URL=https://api.lighton.ai/v1   # atau endpoint vLLM lokal
+LIGHTON_BASE_URL=https://api.lighton.ai/v1   # or your local vLLM endpoint
 LIGHTON_MODEL=lighton-ocr
 
-# kalau pakai GPT-4o:
+# if using GPT-4o:
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
 ```
 
-### 3. Kredensial Google
+### 3. Google credentials
 
-- **Gmail OAuth client**: Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (Desktop) → simpan JSON ke `credentials/gmail_credentials.json`.
-- Run pertama akan membuka browser untuk OAuth Gmail, token disimpan ke `credentials/gmail_token.json`.
-- *(opsional)* **Service Account untuk Sheets**: kalau Anda butuh `--sheets`, buat service account, taruh JSON di `credentials/sheets_service_account.json`, lalu share Sheet target ke email service account-nya.
+- **Gmail OAuth client**: Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (Desktop) → save the JSON to `credentials/gmail_credentials.json`.
+- The first run opens a browser for the Gmail OAuth flow; the token is stored at `credentials/gmail_token.json`.
+- *(optional)* **Service Account for Sheets**: if you need `--sheets`, create a service account, place the JSON at `credentials/sheets_service_account.json`, then share the target Sheet with the service account's email.
 
-## Pemakaian
+## Usage
 
 ```bash
 source /home/rnd/Documents/Belajar/Portofolio_tambbahan/venv/bin/activate
 
-# Default: ambil email kemarin pukul 00:00 sampai sekarang, pakai LightOn → tulis CSV
+# Default: pull emails from yesterday 00:00 until now, using LightOn → write CSV
 python main.py --since "2026-05-17 00:00" --until "2026-05-18 23:59" --engine lighton
 
-# Shortcut: 24 jam terakhir, pakai GPT-4o
+# Shortcut: last 24 hours, using GPT-4o
 python main.py --last-hours 24 --engine gpt-4o
 
-# Fallback manual untuk file dari luar email (bisa diulang)
+# Manual fallback for files outside email (repeatable)
 python main.py --file /path/to/invoice1.pdf --file /path/to/receipt.jpg
 
-# Tambahkan Excel
+# Also write Excel
 python main.py --last-hours 6 --excel
 
-# Tambahkan Google Sheets (perlu service account JSON + SHEET_ID di .env)
+# Also write to Google Sheets (requires service account JSON + SHEET_ID in .env)
 python main.py --last-hours 6 --sheets
 
-# Testing: jangan apply label processed (email akan dipick lagi run berikutnya)
+# Testing: skip applying the processed label (emails get picked up again next run)
 python main.py --last-hours 24 --no-mark-processed
 ```
 
-Hasil:
+Outputs:
 
-- `output/invoices.csv` — satu baris per invoice, append-mode (default).
-- `output/invoices.xlsx` — opsional via `--excel`, baris ber-flag disorot merah.
-- Google Sheet — opsional via `--sheets`.
-- `output/run_*.json` — dump JSON mentah untuk debugging / Loom walkthrough.
-- `downloads/pages/` — PNG hasil render per halaman (berguna saat debugging).
-- `logs/run.log` — log per eksekusi.
+- `output/invoices.csv` — one row per invoice, append mode (default).
+- `output/invoices.xlsx` — optional via `--excel`, flagged rows highlighted in red.
+- Google Sheet — optional via `--sheets`.
+- `output/run_*.json` — raw JSON dump for debugging / Loom walkthroughs.
+- `downloads/pages/` — per-page PNG renders (useful when debugging).
+- `logs/run.log` — per-run log.
 
-## Kolom CSV (auto-derived)
+## CSV columns (auto-derived)
 
-Kolom otomatis ngambil dari `EXTRACTION_SCHEMA` di [ai_extractor.py](ai_extractor.py#L17). Tambah/hapus field di dict itu — prompt ke AI **dan** kolom CSV langsung ikut.
+Columns are pulled automatically from `EXTRACTION_SCHEMA` in [ai_extractor.py](ai_extractor.py#L17). Add or remove a field in that dict — the AI prompt **and** CSV columns follow automatically.
 
-Urutan saat ini:
+Current order:
 
 1. **Metadata**: `received_at`, `source` (gmail/manual), `email_subject`, `attachment_file`
-2. **Dari AI**: `vendor_name`, `invoice_number`, `invoice_date`, `due_date`, `subtotal`, `tax`, `total`, `currency`, `payment_terms`
-3. **Turunan**: `line_items_json`, `line_items_count`, `validation_ok`, `validation_issues`
+2. **From AI**: `vendor_name`, `invoice_number`, `invoice_date`, `due_date`, `subtotal`, `tax`, `total`, `currency`, `payment_terms`
+3. **Derived**: `line_items_json`, `line_items_count`, `validation_ok`, `validation_issues`
 
-## Validasi
+## Validation
 
-Otomatis flag baris jika:
+A row is automatically flagged when:
 
-- Field wajib hilang (`vendor_name`, `invoice_number`, `invoice_date`, `total`)
+- A required field is missing (`vendor_name`, `invoice_number`, `invoice_date`, `total`)
 - Σ `quantity × unit_price` per line ≠ `amount`
-- Σ line item ≠ `subtotal`
+- Σ line items ≠ `subtotal`
 - `subtotal + tax` ≠ `total`
 
 Tolerance: 0.02 (rounding).
 
-## Catatan engine
+## Engine notes
 
-| Engine | API spec | Cocok kalau... |
+| Engine | API spec | Use when... |
 |---|---|---|
-| **lighton** | OpenAI-compatible (`/v1/chat/completions`) | Pakai layanan LightOn cloud, atau host LightOnOCR-1B sendiri via vLLM |
-| **gpt-4o** | OpenAI native | Akurasi tinggi out-of-the-box, butuh credit OpenAI |
+| **lighton** | OpenAI-compatible (`/v1/chat/completions`) | Using the LightOn cloud service, or self-hosting LightOnOCR-1B via vLLM |
+| **gpt-4o** | OpenAI native | High accuracy out of the box, requires OpenAI credit |
 
-**Klasifikasi email**: hanya email yang subject-nya **mengandung `[Invoice]`** (di mana saja — depan, tengah, belakang; case-insensitive) + ada attachment + status unread + **belum punya label `Invoice/Processed`**. Filter ini diterapkan sekaligus di Gmail query supaya server-side, lebih cepat. Edit `INVOICE_SUBJECT_MARKER` di [gmail_client.py](gmail_client.py) kalau mau ganti penanda.
+**Email classification**: only emails whose subject **contains `[Invoice]`** (anywhere — start, middle, or end; case-insensitive) + has an attachment + is unread + does **not** yet have the `Invoice/Processed` label. This filter is pushed into the Gmail query so it runs server-side and stays fast. Edit `INVOICE_SUBJECT_MARKER` in [gmail_client.py](gmail_client.py) if you want to change the marker.
 
-**Tracking sudah-diproses**: Setelah ekstraksi sukses, pipeline apply label Gmail **`Invoice/Processed`** ke email. Status email **tetap UNREAD** (boleh dicek manual oleh tim Anda di inbox), tapi run berikutnya akan skip email tsb otomatis. Mau reproses paksa? Hapus label `Invoice/Processed` di Gmail UI.
+**Processed tracking**: After a successful extraction, the pipeline applies the Gmail label **`Invoice/Processed`** to the email. The email **stays UNREAD** (so your team can still review it manually in the inbox), but subsequent runs skip it automatically. Need to reprocess? Remove the `Invoice/Processed` label in the Gmail UI.
